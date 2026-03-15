@@ -4,10 +4,17 @@
     <meta charset="utf-8">
     <title>Almeida SatTrack</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00ffcc">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon.png">
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --neon: #00ffcc; --danger: #ff4444; --panel: rgba(0, 0, 0, 0.9); }
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; -webkit-tap-highlight-color: transparent; }
         
         #map { width: 100%; height: 100vh; z-index: 1; filter: invert(100%) hue-rotate(180deg) brightness(95%); }
 
@@ -16,26 +23,26 @@
         .ui-element { pointer-events: auto; background: var(--panel); border: 1px solid var(--neon); border-radius: 12px; backdrop-filter: blur(10px); }
 
         /* Painel de Permissões/Status */
-        .status-bar { top: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .status-bar { top: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .brand-line { display: flex; justify-content: space-between; align-items: center; }
-        .brand-name { color: var(--neon); font-weight: bold; font-size: 14px; }
+        .brand-name { color: var(--neon); font-weight: bold; font-size: 14px; letter-spacing: 1px; }
         
         .perm-badge { font-size: 10px; padding: 4px 8px; border-radius: 20px; text-transform: uppercase; font-weight: bold; }
         .perm-off { background: rgba(255, 68, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); }
         .perm-on { background: rgba(0, 255, 204, 0.2); color: var(--neon); border: 1px solid var(--neon); }
 
-        select { width: 100%; padding: 12px; background: #111; color: var(--neon); border: 1px solid #333; border-radius: 8px; font-size: 16px; margin-top: 5px; }
+        select { width: 100%; padding: 12px; background: #111; color: var(--neon); border: 1px solid #333; border-radius: 8px; font-size: 16px; margin-top: 5px; outline: none; }
 
         /* Card Pro */
-        .info-card { bottom: 20px; padding: 15px; display: none; align-items: center; gap: 15px; }
+        .info-card { bottom: 20px; padding: 15px; display: none; align-items: center; gap: 15px; box-shadow: 0 -4px 20px rgba(0, 255, 204, 0.2); }
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-grow: 1; }
         .stat-box { border-left: 2px solid #222; padding-left: 8px; }
         .stat-label { color: #666; font-size: 9px; text-transform: uppercase; }
         .stat-value { color: var(--neon); font-size: 15px; font-weight: bold; font-family: monospace; }
 
         /* Bússola Lateral */
-        #compass-ui { width: 70px; height: 70px; border: 2px solid #222; border-radius: 50%; position: relative; flex-shrink: 0; }
-        #ndl-n { width: 2px; height: 30px; background: var(--danger); position: absolute; left: 50%; top: 5px; transform-origin: bottom center; transition: transform 0.1s ease-out; }
+        #compass-ui { width: 70px; height: 70px; border: 2px solid #222; border-radius: 50%; position: relative; flex-shrink: 0; background: rgba(255,255,255,0.02); }
+        #ndl-n { width: 2px; height: 30px; background: var(--danger); position: absolute; left: 50%; top: 5px; transform-origin: bottom center; }
         #ndl-s { width: 4px; height: 32px; background: var(--neon); position: absolute; left: 50%; top: 4px; transform-origin: bottom center; display: none; box-shadow: 0 0 10px var(--neon); }
 
         /* Botão Ação */
@@ -43,10 +50,8 @@
             position: absolute; right: 15px; bottom: 180px; z-index: 1000;
             width: 55px; height: 55px; border-radius: 50%; background: var(--neon);
             border: none; font-size: 24px; cursor: pointer; box-shadow: 0 0 15px rgba(0,255,204,0.4);
+            display: flex; align-items: center; justify-content: center;
         }
-
-        /* Modal de Calibração */
-        #calib-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel); color: #fff; padding: 20px; border-radius: 15px; border: 1px dashed var(--neon); text-align: center; z-index: 2000; display: none; width: 80%; pointer-events: none; }
 
         footer { position: absolute; bottom: 5px; width: 100%; text-align: center; color: #444; font-size: 9px; z-index: 1001; }
     </style>
@@ -54,8 +59,6 @@
 <body>
 
     <div id="map"></div>
-
-    <div id="calib-msg">🔄 Calibrando Sensores...<br><small>Mova o celular em forma de "8"</small></div>
 
     <div class="ui-overlay status-bar ui-element">
         <div class="brand-line">
@@ -86,10 +89,14 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let lat, lon, satLon = null, currentHeading = 0;
+    let lat, lon, satLon = null;
+    let currentHeading = 0;
+    let smoothedHeading = 0;
+    const filterAlpha = 0.15; // Suavização da bússola (menor = mais estável)
+    
     let map, userMarker, satLine, audioCtx;
 
-    // Inicia Mapa
+    // Inicialização do Mapa
     map = L.map('map', { zoomControl: false, attributionControl: false }).setView([-15, -50], 4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -146,24 +153,25 @@
 ];
 
     const select = document.getElementById("satSelect");
-    satellites.forEach(s => select.add(new Option(s.nome, s.pos)));
+    satellites.sort((a,b) => a.pos - b.pos).forEach(s => select.add(new Option(s.nome, s.pos)));
 
-    // --- SISTEMA DE PERMISSÕES ---
+    // Registro de Service Worker para PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.log("SW Erro:", err));
+    }
+
     async function requestPermissions() {
-        // 1. Inicia Áudio
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // 2. Solicita GPS
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(updateGPS, handleGPSError, { enableHighAccuracy: true });
         }
 
-        // 3. Solicita Orientação (iOS 13+ exige clique do usuário)
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
                 const response = await DeviceOrientationEvent.requestPermission();
                 if (response === 'granted') startCompass();
-            } catch (e) { alert("Permissão de Bússola Negada"); }
+            } catch (e) { alert("Acesso aos sensores negado."); }
         } else {
             startCompass();
         }
@@ -187,22 +195,29 @@
         atualizarCalculos();
     }
 
-    function handleGPSError() {
-        alert("Ative o GPS do celular e o 'Local' no navegador.");
-    }
+    function handleGPSError() { alert("Por favor, ative o GPS."); }
 
     function startCompass() {
         window.addEventListener("deviceorientationabsolute", (e) => {
             if (e.alpha !== null) {
-                // Filtro para suavizar movimento
-                currentHeading = 360 - e.alpha;
+                let rawHeading = 360 - e.alpha;
+                
+                // Evita o salto brusco entre 0 e 360 graus no filtro
+                if (Math.abs(rawHeading - smoothedHeading) > 180) {
+                    if (rawHeading > smoothedHeading) smoothedHeading += 360;
+                    else smoothedHeading -= 360;
+                }
+                
+                // Aplicação do Filtro de Suavização
+                smoothedHeading = smoothedHeading + filterAlpha * (rawHeading - smoothedHeading);
+                currentHeading = (smoothedHeading + 360) % 360;
+
                 document.getElementById("ndl-n").style.transform = `translateX(-50%) rotate(${currentHeading}deg)`;
                 atualizarCalculos();
             }
         }, true);
     }
 
-    // --- CÁLCULOS E UI ---
     select.onchange = () => {
         satLon = parseFloat(select.value);
         if(!isNaN(satLon)) {
@@ -231,10 +246,10 @@
         const totalRot = (az + currentHeading) % 360;
         sNeedle.style.transform = `translateX(-50%) rotate(${totalRot}deg)`;
 
-        // Bipe de Aproximação (Lógica de 15 graus)
-        let diff = Math.abs(totalRot);
+        // Som de proximidade (Beep)
+        let diff = Math.abs(totalRot % 360);
         if (diff > 180) diff = 360 - diff;
-        if (diff < 15 && Math.random() > (diff/15)) playBeep();
+        if (diff < 10 && Math.random() > (diff/10)) playBeep();
 
         drawVisualPath(lat, lon, az);
     }
@@ -244,23 +259,22 @@
         let osc = audioCtx.createOscillator();
         let gn = audioCtx.createGain();
         osc.connect(gn); gn.connect(audioCtx.destination);
-        osc.frequency.value = 1000; gn.gain.value = 0.1;
-        osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+        osc.frequency.value = 1000; gn.gain.value = 0.05;
+        osc.start(); osc.stop(audioCtx.currentTime + 0.04);
     }
 
     function drawVisualPath(uLat, uLon, az) {
         if (satLine) map.removeLayer(satLine);
         const brng = az * Math.PI / 180;
-        const d = 0.2; const R = 6371;
+        const d = 0.25; const R = 6371;
         const rLat = uLat * Math.PI / 180; const rLon = uLon * Math.PI / 180;
         let nLat = Math.asin(Math.sin(rLat)*Math.cos(d/R) + Math.cos(rLat)*Math.sin(d/R)*Math.cos(brng));
         let nLon = rLon + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(rLat), Math.cos(d/R)-Math.sin(rLat)*Math.sin(nLat));
         satLine = L.polyline([[uLat, uLon], [nLat * 180/Math.PI, nLon * 180/Math.PI]], {
-            color: '#00ffcc', weight: 4, dashArray: '8, 12'
+            color: '#00ffcc', weight: 4, dashArray: '10, 15', opacity: 0.7
         }).addTo(map);
     }
 
-    // Fórmulas Matemáticas
     function calcAz(la, lo, sl) {
         let dl = (sl - lo) * Math.PI / 180;
         let rl = la * Math.PI / 180;
