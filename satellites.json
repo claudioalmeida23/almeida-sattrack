@@ -1,0 +1,28 @@
+{
+  "satellites": [
+    { "nome": "Turksat 42E", "pos": 42 },
+    { "nome": "Astra 19.2E", "pos": 19.2 },
+    { "nome": "Hotbird 13E", "pos": 13 },
+    { "nome": "Hispasat 30W", "pos": -30 },
+    { "nome": "SES 4 (-22W)", "pos": -22 },
+    { "nome": "Intelsat 35 (-34.5W)", "pos": -34.5 },
+    { "nome": "SES 6 (-40.5W)", "pos": -40.5 },
+    { "nome": "Sky Brasil-1 (-43.1W)", "pos": -43.1 },
+    { "nome": "Intelsat 11 (-43W)", "pos": -43 },
+    { "nome": "Intelsat 14 (-45W)", "pos": -45 },
+    { "nome": "Intelsat 32B (-45.1W)", "pos": -45.1 },
+    { "nome": "Intelsat 21 (-58W)", "pos": -58 },
+    { "nome": "Amazonas 2/3/5 (-61W)", "pos": -61 },
+    { "nome": "Telstar 14R (-63W)", "pos": -63 },
+    { "nome": "Eutelsat 65W", "pos": -65 },
+    { "nome": "SES 10 (-67W)", "pos": -67 },
+    { "nome": "StarOne C2/D2 (-70W)", "pos": -70 },
+    { "nome": "StarOne C4 (-70W)", "pos": -70 },
+    { "nome": "Arsat 1 (-71.8W)", "pos": -71.8 },
+    { "nome": "Hispasat 74W", "pos": -74 },
+    { "nome": "StarOne C3 (-75W)", "pos": -75 },
+    { "nome": "Eutelsat 113 West A (-113W)", "pos": -113 },
+    { "nome": "Galaxy 28 (-89W)", "pos": -89 },
+    { "nome": "Galaxy 19 (-97W)", "pos": -97 }
+  ]
+}
