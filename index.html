@@ -6,88 +6,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        :root { --neon: #00ffcc; --danger: #ff4444; --panel: rgba(0, 0, 0, 0.9); }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }
         
-        /* Mapa Dark Mode de alta economia de energia */
-        #map { 
-            width: 100%; height: 100vh; z-index: 1; background: #000;
-            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-        }
+        #map { width: 100%; height: 100vh; z-index: 1; filter: invert(100%) hue-rotate(180deg) brightness(95%); }
 
-        /* Interface do Usuário */
-        .ui-overlay { position: absolute; z-index: 1000; width: 92%; left: 4%; pointer-events: none; }
-        .ui-element { pointer-events: auto; background: rgba(0, 0, 0, 0.9); border: 1px solid #00ffcc; border-radius: 12px; backdrop-filter: blur(8px); }
+        /* Interface */
+        .ui-overlay { position: absolute; z-index: 1000; width: 94%; left: 3%; pointer-events: none; }
+        .ui-element { pointer-events: auto; background: var(--panel); border: 1px solid var(--neon); border-radius: 12px; backdrop-filter: blur(10px); }
 
-        .top-panel { top: 15px; padding: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .brand-title { color: #00ffcc; font-size: 14px; font-weight: bold; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
+        /* Painel de Permissões/Status */
+        .status-bar { top: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .brand-line { display: flex; justify-content: space-between; align-items: center; }
+        .brand-name { color: var(--neon); font-weight: bold; font-size: 14px; }
         
-        select { 
-            width: 100%; padding: 12px; background: #111; color: #00ffcc; 
-            border: 1px solid #333; border-radius: 6px; font-size: 16px; outline: none; 
+        .perm-badge { font-size: 10px; padding: 4px 8px; border-radius: 20px; text-transform: uppercase; font-weight: bold; }
+        .perm-off { background: rgba(255, 68, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+        .perm-on { background: rgba(0, 255, 204, 0.2); color: var(--neon); border: 1px solid var(--neon); }
+
+        select { width: 100%; padding: 12px; background: #111; color: var(--neon); border: 1px solid #333; border-radius: 8px; font-size: 16px; margin-top: 5px; }
+
+        /* Card Pro */
+        .info-card { bottom: 20px; padding: 15px; display: none; align-items: center; gap: 15px; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-grow: 1; }
+        .stat-box { border-left: 2px solid #222; padding-left: 8px; }
+        .stat-label { color: #666; font-size: 9px; text-transform: uppercase; }
+        .stat-value { color: var(--neon); font-size: 15px; font-weight: bold; font-family: monospace; }
+
+        /* Bússola Lateral */
+        #compass-ui { width: 70px; height: 70px; border: 2px solid #222; border-radius: 50%; position: relative; flex-shrink: 0; }
+        #ndl-n { width: 2px; height: 30px; background: var(--danger); position: absolute; left: 50%; top: 5px; transform-origin: bottom center; transition: transform 0.1s ease-out; }
+        #ndl-s { width: 4px; height: 32px; background: var(--neon); position: absolute; left: 50%; top: 4px; transform-origin: bottom center; display: none; box-shadow: 0 0 10px var(--neon); }
+
+        /* Botão Ação */
+        .btn-main {
+            position: absolute; right: 15px; bottom: 180px; z-index: 1000;
+            width: 55px; height: 55px; border-radius: 50%; background: var(--neon);
+            border: none; font-size: 24px; cursor: pointer; box-shadow: 0 0 15px rgba(0,255,204,0.4);
         }
 
-        /* Card de Dados Técnicos */
-        .info-card { 
-            bottom: 30px; padding: 15px; display: none;
-            grid-template-columns: 1fr auto; gap: 12px;
-            box-shadow: 0 -4px 20px rgba(0, 255, 204, 0.2);
-        }
+        /* Modal de Calibração */
+        #calib-msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel); color: #fff; padding: 20px; border-radius: 15px; border: 1px dashed var(--neon); text-align: center; z-index: 2000; display: none; width: 80%; pointer-events: none; }
 
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .stat-item { color: #555; font-size: 9px; text-transform: uppercase; font-weight: bold; }
-        .stat-value { color: #00ffcc; font-size: 16px; font-weight: bold; font-family: 'Courier New', monospace; }
-
-        /* Bússola HUD */
-        #mini-compass {
-            width: 75px; height: 75px; border: 2px solid #222; border-radius: 50%;
-            position: relative; align-self: center; background: rgba(0, 255, 204, 0.02);
-        }
-        #ndl-n { width: 2px; height: 32px; background: #ff4444; position: absolute; left: 50%; top: 5px; transform-origin: bottom center; }
-        #ndl-s { width: 4px; height: 32px; background: #00ffcc; position: absolute; left: 50%; top: 5px; transform-origin: bottom center; display: none; box-shadow: 0 0 8px #00ffcc; }
-
-        .btn-gps {
-            position: absolute; right: 20px; bottom: 220px; z-index: 1000;
-            width: 55px; height: 55px; border-radius: 50%; background: #00ffcc;
-            border: none; font-size: 24px; cursor: pointer; box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
-            display: flex; align-items: center; justify-content: center;
-        }
-
-        footer { position: absolute; bottom: 6px; width: 100%; text-align: center; color: rgba(255,255,255,0.2); font-size: 10px; z-index: 1001; }
+        footer { position: absolute; bottom: 5px; width: 100%; text-align: center; color: #444; font-size: 9px; z-index: 1001; }
     </style>
 </head>
 <body>
 
     <div id="map"></div>
 
-    <div class="ui-overlay top-panel ui-element">
-        <div class="brand-title">Almeida SatTrack</div>
+    <div id="calib-msg">🔄 Calibrando Sensores...<br><small>Mova o celular em forma de "8"</small></div>
+
+    <div class="ui-overlay status-bar ui-element">
+        <div class="brand-line">
+            <span class="brand-name">ALMEIDA SATTRACK</span>
+            <div id="gps-status" class="perm-badge perm-off">GPS OFF</div>
+        </div>
         <select id="satSelect">
             <option value="">Selecione o Satélite...</option>
         </select>
     </div>
 
-    <button class="btn-gps" onclick="startGPS()">📍</button>
+    <button class="btn-main" id="btnAuth" onclick="requestPermissions()">🛰️</button>
 
     <div class="ui-overlay info-card ui-element" id="card">
         <div class="stats-grid">
-            <div>
-                <div class="stat-item">Azimute</div>
-                <div class="stat-value" id="val-az">--</div>
-            </div>
-            <div>
-                <div class="stat-item">Elevação</div>
-                <div class="stat-value" id="val-el">--</div>
-            </div>
-            <div>
-                <div class="stat-item">LNB Skew</div>
-                <div class="stat-value" id="val-sk">--</div>
-            </div>
-            <div>
-                <div class="stat-item">Orbital</div>
-                <div class="stat-value" id="val-pos">--</div>
-            </div>
+            <div class="stat-box"><div class="stat-label">Azimute</div><div class="stat-value" id="val-az">--</div></div>
+            <div class="stat-box"><div class="stat-label">Elevação</div><div class="stat-value" id="val-el">--</div></div>
+            <div class="stat-box"><div class="stat-label">LNB Skew</div><div class="stat-value" id="val-sk">--</div></div>
+            <div class="stat-box"><div class="stat-label">Relógio LNB</div><div class="stat-value" id="val-lnb-h">--</div></div>
         </div>
-        <div id="mini-compass">
+        <div id="compass-ui">
             <div id="ndl-n"></div>
             <div id="ndl-s"></div>
         </div>
@@ -98,14 +87,13 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     let lat, lon, satLon = null, currentHeading = 0;
-    let map, userMarker, satLine;
+    let map, userMarker, satLine, audioCtx;
 
-    // Inicialização do Mapa
-    map = L.map('map', { zoomControl: false }).setView([-15, -50], 4);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    // Inicia Mapa
+    map = L.map('map', { zoomControl: false, attributionControl: false }).setView([-15, -50], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // Lista Global Organizada
-   const satellites = [
+    const satellites = [
     // --- AMÉRICAS (WEST) ---
     { "nome": "Tupac Katari 1 (-87.2W)", "pos": -87.2 },
     { "nome": "Galaxy 28 (-89W)", "pos": -89 },
@@ -158,95 +146,136 @@
 ];
 
     const select = document.getElementById("satSelect");
-    satellites.sort((a,b) => a.pos - b.pos).forEach(sat => {
-        let opt = document.createElement("option");
-        opt.value = sat.pos;
-        opt.text = sat.nome;
-        select.appendChild(opt);
-    });
+    satellites.forEach(s => select.add(new Option(s.nome, s.pos)));
 
+    // --- SISTEMA DE PERMISSÕES ---
+    async function requestPermissions() {
+        // 1. Inicia Áudio
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // 2. Solicita GPS
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(updateGPS, handleGPSError, { enableHighAccuracy: true });
+        }
+
+        // 3. Solicita Orientação (iOS 13+ exige clique do usuário)
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            try {
+                const response = await DeviceOrientationEvent.requestPermission();
+                if (response === 'granted') startCompass();
+            } catch (e) { alert("Permissão de Bússola Negada"); }
+        } else {
+            startCompass();
+        }
+        
+        document.getElementById("btnAuth").style.display = "none";
+    }
+
+    function updateGPS(pos) {
+        lat = pos.coords.latitude;
+        lon = pos.coords.longitude;
+        const status = document.getElementById("gps-status");
+        status.innerText = "GPS ON";
+        status.className = "perm-badge perm-on";
+        
+        if (!userMarker) {
+            userMarker = L.circleMarker([lat, lon], { color: '#00ffcc', radius: 7, fillOpacity: 1 }).addTo(map);
+            map.flyTo([lat, lon], 18);
+        } else {
+            userMarker.setLatLng([lat, lon]);
+        }
+        atualizarCalculos();
+    }
+
+    function handleGPSError() {
+        alert("Ative o GPS do celular e o 'Local' no navegador.");
+    }
+
+    function startCompass() {
+        window.addEventListener("deviceorientationabsolute", (e) => {
+            if (e.alpha !== null) {
+                // Filtro para suavizar movimento
+                currentHeading = 360 - e.alpha;
+                document.getElementById("ndl-n").style.transform = `translateX(-50%) rotate(${currentHeading}deg)`;
+                atualizarCalculos();
+            }
+        }, true);
+    }
+
+    // --- CÁLCULOS E UI ---
     select.onchange = () => {
         satLon = parseFloat(select.value);
         if(!isNaN(satLon)) {
-            document.getElementById("card").style.display = "grid";
-            atualizarTudo();
+            document.getElementById("card").style.display = "flex";
+            atualizarCalculos();
         }
     };
 
-    function startGPS() {
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(pos => {
-                lat = pos.coords.latitude;
-                lon = pos.coords.longitude;
-                map.flyTo([lat, lon], 19);
-                if (userMarker) userMarker.setLatLng([lat, lon]);
-                else userMarker = L.circleMarker([lat, lon], { color: '#00ffcc', radius: 6, fillOpacity: 1 }).addTo(map);
-                atualizarTudo();
-            }, (err) => alert("Erro GPS: " + err.message), { enableHighAccuracy: true });
-        }
-    }
-
-    // Listener para bússola do dispositivo
-    window.addEventListener("deviceorientationabsolute", (e) => {
-        if (e.alpha !== null) {
-            currentHeading = e.alpha;
-            document.getElementById("ndl-n").style.transform = `translateX(-50%) rotate(${-currentHeading}deg)`;
-            atualizarTudo();
-        }
-    }, true);
-
-    function atualizarTudo() {
+    function atualizarCalculos() {
         if (lat === undefined || satLon === null) return;
 
-        const az = calcularAzimute(lat, lon, satLon);
-        const el = calcularElevacao(lat, lon, satLon);
-        const sk = calcularSkew(lat, lon, satLon);
+        const az = calcAz(lat, lon, satLon);
+        const el = calcEl(lat, lon, satLon);
+        const sk = calcSk(lat, lon, satLon);
+        
+        let lnbH = Math.round(7 + (sk / 30));
+        if (lnbH > 12) lnbH -= 12;
 
-        // UI Update
         document.getElementById("val-az").innerText = az.toFixed(1) + "°";
         document.getElementById("val-el").innerText = el.toFixed(1) + "°";
         document.getElementById("val-sk").innerText = sk.toFixed(1) + "°";
-        document.getElementById("val-pos").innerText = satLon + "°";
+        document.getElementById("val-lnb-h").innerText = `~${lnbH}h`;
 
-        // Bússola HUD
         const sNeedle = document.getElementById("ndl-s");
         sNeedle.style.display = "block";
-        sNeedle.style.transform = `translateX(-50%) rotate(${az - currentHeading}deg)`;
+        const totalRot = (az + currentHeading) % 360;
+        sNeedle.style.transform = `translateX(-50%) rotate(${totalRot}deg)`;
 
-        // Linha Visual no Mapa
-        desenharLinha(lat, lon, az);
+        // Bipe de Aproximação (Lógica de 15 graus)
+        let diff = Math.abs(totalRot);
+        if (diff > 180) diff = 360 - diff;
+        if (diff < 15 && Math.random() > (diff/15)) playBeep();
+
+        drawVisualPath(lat, lon, az);
     }
 
-    function calcularSkew(lat, lon, satLon) {
-        let dLon = (satLon - lon) * Math.PI / 180;
-        let rLat = lat * Math.PI / 180;
-        return (Math.atan(Math.sin(dLon) / Math.tan(rLat))) * 180 / Math.PI;
+    function playBeep() {
+        if (!audioCtx) return;
+        let osc = audioCtx.createOscillator();
+        let gn = audioCtx.createGain();
+        osc.connect(gn); gn.connect(audioCtx.destination);
+        osc.frequency.value = 1000; gn.gain.value = 0.1;
+        osc.start(); osc.stop(audioCtx.currentTime + 0.05);
     }
 
-    function desenharLinha(uLat, uLon, az) {
+    function drawVisualPath(uLat, uLon, az) {
         if (satLine) map.removeLayer(satLine);
-        const d = 0.25; const R = 6371; const brng = az * Math.PI / 180;
+        const brng = az * Math.PI / 180;
+        const d = 0.2; const R = 6371;
         const rLat = uLat * Math.PI / 180; const rLon = uLon * Math.PI / 180;
-        let dLat = Math.asin(Math.sin(rLat)*Math.cos(d/R) + Math.cos(rLat)*Math.sin(d/R)*Math.cos(brng));
-        let dLon = rLon + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(rLat), Math.cos(d/R)-Math.sin(rLat)*Math.sin(dLat));
-        satLine = L.polyline([[uLat, uLon], [dLat * 180/Math.PI, dLon * 180/Math.PI]], {
-            color: '#00ffcc', weight: 3, opacity: 0.8, dashArray: '5, 10'
+        let nLat = Math.asin(Math.sin(rLat)*Math.cos(d/R) + Math.cos(rLat)*Math.sin(d/R)*Math.cos(brng));
+        let nLon = rLon + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(rLat), Math.cos(d/R)-Math.sin(rLat)*Math.sin(nLat));
+        satLine = L.polyline([[uLat, uLon], [nLat * 180/Math.PI, nLon * 180/Math.PI]], {
+            color: '#00ffcc', weight: 4, dashArray: '8, 12'
         }).addTo(map);
     }
 
-    function calcularAzimute(lat, lon, satLon) {
-        let dlon = (satLon - lon) * Math.PI / 180;
-        let rLat = lat * Math.PI / 180;
-        let az = Math.atan2(Math.sin(dlon), -Math.tan(rLat) * Math.cos(dlon));
-        return (az * 180 / Math.PI + 360) % 360;
+    // Fórmulas Matemáticas
+    function calcAz(la, lo, sl) {
+        let dl = (sl - lo) * Math.PI / 180;
+        let rl = la * Math.PI / 180;
+        return (Math.atan2(Math.sin(dl), -Math.tan(rl) * Math.cos(dl)) * 180 / Math.PI + 360) % 360;
     }
-
-    function calcularElevacao(lat, lon, satLon) {
-        let dlon = (satLon - lon) * Math.PI / 180;
-        let rLat = lat * Math.PI / 180;
-        let cosC = Math.cos(rLat) * Math.cos(dlon);
-        let el = Math.atan((cosC - 0.1512) / Math.sqrt(1 - cosC * cosC));
-        return el * 180 / Math.PI;
+    function calcEl(la, lo, sl) {
+        let dl = (sl - lo) * Math.PI / 180;
+        let rl = la * Math.PI / 180;
+        let cC = Math.cos(rl) * Math.cos(dl);
+        return Math.atan((cC - 0.1512) / Math.sqrt(1 - cC * cC)) * 180 / Math.PI;
+    }
+    function calcSk(la, lo, sl) {
+        let dl = (sl - lo) * Math.PI / 180;
+        let rl = la * Math.PI / 180;
+        return Math.atan(Math.sin(dl) / Math.tan(rl)) * 180 / Math.PI;
     }
 </script>
 </body>
